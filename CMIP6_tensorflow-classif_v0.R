@@ -3,13 +3,15 @@
 ## Need to: module load R/4.4.1 tensorflow/2.15.0
 ## Can we identify a CMIP6 model from one SLP map over the eastern North
 ## Atlantic?
-## Randomisation des modeles
-## Pascal Yiou (LSCE), Oct. 2024, Nov. 2024
-## Version v1 proche de l'originale.
+## Randomisation des modeles version V1 sur github
+## Pascal Yiou (LSCE), Oct. 2024, Nov. 2024, Dec. 2024
+## Version v1 proche de l'originale (V0).
 ## C'est celle qui marche le mieux
 ## Fonctionne sur la machine GPU hal de l'IPSL
+## Faire: git branch -M V1 dans le répertoire
+## ${HOME}/programmes/RStat/CMIP6class/V0
 ## Se lance par:
-## R CMD BATCH "--args SAISON NMOD NSIM JOBID" ${HOME}/programmes/RStat/CMIP6class/CMIP6_tensorflow-classif_v1.R
+## R CMD BATCH "--args SAISON NMOD NSIM JOBID" ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_tensorflow-classif_v0.R
 ## ou JOBID=`echo ${PBS_JOBID} | cut -d. -f1`
 ## est décrit dans le script qui lance le programme
 
@@ -281,50 +283,3 @@ dev.off()
 
 q("no")
 
-## Figures
-dum=t(matrix(unlist(strsplit(names(countsim),"_")),nrow=2))
-ndum=dum[,2]
-modcol=ifelse(countsim>1,"red","blue")
-pdf(file="count-sim_CMIP.pdf",width=12)
-par(mar=c(10,4,1,1))
-plot(countsim,type="h",axes=FALSE,ylab="Nb sim.",xlab="",col=modcol,lwd=3)
-axis(side=2)
-axis(side=1,at=c(1:length(countsim)),labels=ndum,las=2)
-box()
-dev.off()
-
-filout="test_CMIP-ez_OK"
-save(file=paste(filout,".Rdat",sep=""),L.OK.seas,l.mod,l.names)
-
-## Figures
-pdf(paste(filout,".pdf",sep=""),width=12)
-layout(matrix(1:4,2,2))
-par(mar=c(4,4,1,1))
-i=1
-for(seas in names(l.seas)){
-    boxplot(L.OK.seas[[seas]],ylab="Prob. success",xlab="Model",
-            axes=FALSE,ylim=c(0.5,1))
-    axis(side=2)
-    axis(side=1,at=c(1:length(l.names)),l.names)
-    box()
-    legend("bottomleft",bty="n",paste("(",letters[i],") ",seas,sep=""))
-    i=i+1
-}
-dev.off()
-
-filout="test_CMIP-test_OK"
-
-pdf(paste(filout,".pdf",sep=""),width=12)
-layout(matrix(1:4,2,2))
-par(mar=c(4,4,1,1))
-i=1
-for(seas in names(l.seas)){
-    boxplot(L.OK.seas.test[[seas]],ylab="Prob. success",xlab="Model",
-            axes=FALSE,ylim=c(0.6,1))
-    axis(side=2)
-    axis(side=1,at=c(1:3),l.modname)
-    box()
-    legend("bottomleft",bty="n",paste("(",letters[i],") ",seas,sep=""))
-    i=i+1
-}
-dev.off()

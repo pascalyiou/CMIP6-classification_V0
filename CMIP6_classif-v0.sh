@@ -1,8 +1,9 @@
 #!/bin/bash -l
 ## Lancement en BATCH de classifications de modeles par tensorflow
-## Pascal Yiou (LSCE), Nov. 2024
+## Version V1
+## Pascal Yiou (LSCE), Nov. 2024, Dec. 2024
 ## Se lance sur HAL par:
-## sbatch ${HOME}/programmes/RStat/CMIP6class/CMIP6_classif-v1.sh NMOD 
+## sbatch ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_classif-v0.sh NMOD 
 
 # Instructions SBATCH always at the beginning of the script!
 
@@ -10,7 +11,7 @@
 # Warning: the environment variables, e.g. $HOME,
 # are not interpreted for the SBATCH instructions.
 # Writing absolute paths is recommended.
-#SBATCH -D /home/pyiou/programmes/RStat/CMIP6class
+#SBATCH -D /home/pyiou/programmes/RStat/CMIP6class/V0/
 
 # The job partition (maximum elapsed time of the job).
 ##SBATCH --partition=day  
@@ -30,6 +31,8 @@
 # %j implements a job counter.
 #SBATCH --error=slurm-%j.err
 #SBATCH --output=slurm-%j.out
+
+## git branch -M V1
 
 # Overtakes the system memory limits.
 ulimit -s unlimited
@@ -51,11 +54,10 @@ NMOD=$1
 ## Nombre de classifications
 NSIM=50
 
-R CMD BATCH "--args JJA ${NMOD} ${NSIM} ${JOBID}" ${HOME}/programmes/RStat/CMIP6class/CMIP6_tensorflow-classif_v1.R
-R CMD BATCH "--args DJF ${NMOD} ${NSIM} ${JOBID}" ${HOME}/programmes/RStat/CMIP6class/CMIP6_tensorflow-classif_v1.R
-R CMD BATCH "--args MAM ${NMOD} ${NSIM} ${JOBID}" ${HOME}/programmes/RStat/CMIP6class/CMIP6_tensorflow-classif_v1.R
-R CMD BATCH "--args SON ${NMOD} ${NSIM} ${JOBID}" ${HOME}/programmes/RStat/CMIP6class/CMIP6_tensorflow-classif_v1.R
-
+R CMD BATCH "--args JJA ${NMOD} ${NSIM} ${JOBID}" ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_tensorflow-classif_v0.R
+R CMD BATCH "--args DJF ${NMOD} ${NSIM} ${JOBID}" ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_tensorflow-classif_v0.R
+R CMD BATCH "--args MAM ${NMOD} ${NSIM} ${JOBID}" ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_tensorflow-classif_v0.R
+R CMD BATCH "--args SON ${NMOD} ${NSIM} ${JOBID}" ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_tensorflow-classif_v0.R
 
 
 end_date=`date +"%m/%d/%Y (%H:%M)"`
