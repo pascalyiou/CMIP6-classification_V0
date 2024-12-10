@@ -6,10 +6,11 @@
 ## (autres runs CMIP6)
 ## Pascal Yiou (LSCE),  Nov. 2024
 ## Demande d'avoir lancé:
-## sbatch ${HOME}/programmes/RStat/CMIP6class/CMIP6_classif-v1.sh NMOD
+## sbatch ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_classif-v0.sh NMOD
+## dans la version V1 sur github: git branch -M V1
 ## Fonctionne sur la machine GPU hal de l'IPSL
 ## Se lance par:
-## R CMD BATCH "--args SAISON NMOD JOBID" ${HOME}/programmes/RStat/CMIP6class/CMIP6_tensorflow-verif_v1.R
+## R CMD BATCH "--args SAISON NMOD JOBID" ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_tensorflow-verif_v1.R
 ## ou JOBID=${SLURM_JOB_ID}
 ## est décrit dans le script qui a lance le programme précédent
 
