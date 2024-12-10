@@ -1,17 +1,17 @@
-## Attention: v0 de référence. NE PLUS TOUCHER!
 ## Run a tensorflow example test
 ## Install and prepare tensor flow on hal
-##
 ## Need to: module load R/4.4.1 tensorflow/2.15.0
-##
 ## Can we identify a CMIP6 model from one SLP map over the eastern North
 ## Atlantic?
+## Randomisation des modeles
 ## Pascal Yiou (LSCE), Oct. 2024, Nov. 2024
-## Version v0 proche de l'originale.
-## C'est celle qui marche le mieux. NE PAS TOUCHER!
+## Version v1 proche de l'originale.
+## C'est celle qui marche le mieux
 ## Fonctionne sur la machine GPU hal de l'IPSL
 ## Se lance par:
-## R CMD BATCH "--args SEAS NMOD" ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_tensorflow-classif_v0.R 
+## R CMD BATCH "--args SAISON NMOD NSIM JOBID" ${HOME}/programmes/RStat/CMIP6class/CMIP6_tensorflow-classif_v1.R
+## ou JOBID=`echo ${PBS_JOBID} | cut -d. -f1`
+## est décrit dans le script qui lance le programme
 
 SI=Sys.info()
 user=SI[["user"]]
@@ -34,6 +34,7 @@ if(SI[[1]] == "Darwin"){
 ## Code set up
 ## Pour l'IA
 library(keras3)
+nneurons=256 ## Nombre de neuronnes. Par défaut: nneurons=128
 ## Pour lire les fichier netcdf
 library(ncdf4)
 library(ncdf4.helpers)
@@ -46,21 +47,24 @@ source(paste(Rsource,"imagecont.R",sep=""))
 args=(commandArgs(TRUE))
 print(args)
 i=1
+jobid = "testjob"
 if(length(args)>0){
     seas = args[i];i=i+1 ## Saison pour le calcul
     nmod = as.numeric(args[i]) ;i=i+1 ## Nombre de modeles à prendre
-}else{ ## S'il n'y a pas d'argument
+    nsim = as.numeric(args[i]) ;i=i+1
+    jobid = args[i] ;i=i+1 ## Indice du job
+}else{
     seas = "JJA" ## Saison pour le calcul
-    nmod = 16 ## Nombre de modeles à prendre
+    nmod = 10 ## Nombre de modeles à prendre
+    nsim = 20
+    jobid = "testjob"
 }
-
-nneurons=256
 
 ## Date set up
 ## Liste des saisons
 l.seas=list(DJF=c(12,1,2),MAM=c(3,4,5),JJA=c(6,7,8),SON=c(9,10,11))
 ## On va repeter l'apprentissage nsim fois
-nsim=20
+##nsim=20
 ## Nombre d'échantillons d'entraînement pour chaque modèle
 ntrain=2000
 
@@ -108,23 +112,25 @@ countsim= tapply(namsim,namsim,length)
 l.mod2=unamsim[which(countsim >= 2)]
 
 ## Read CMIP6 simulation data
-l.mod.sel=c("BCC_BCC-ESM1","CAS_FGOALS-g3","CCCma_CanESM5","CNRM-CERFACS_CNRM-ESM2-1","IPSL_IPSL-CM6A-LR")
+##l.mod.sel=c("BCC_BCC-ESM1","CAS_FGOALS-g3","CCCma_CanESM5","CNRM-CERFACS_CNRM-ESM2-1","IPSL_IPSL-CM6A-LR")
 l.mod.sel=c("BCC_BCC-ESM1","CAS_FGOALS-g3","CCCma_CanESM5",
-                  "CNRM-CERFACS_CNRM-CM6-1","CSIRO_ACCESS-ESM1-5",
-                  "EC-Earth-Consortium_EC-Earth3",
+            "CNRM-CERFACS_CNRM-CM6-1","CSIRO_ACCESS-ESM1-5",
+            "EC-Earth-Consortium_EC-Earth3",
  ##                 "HAMMOZ-Consortium_MPI-ESM-1-2-HAM",
-                  "INM_INM-CM5-0","IPSL_IPSL-CM6A-LR","MIROC_MIROC6",
+            "INM_INM-CM5-0","IPSL_IPSL-CM6A-LR","MIROC_MIROC6",
             "MOHC_HadGEM3-GC31-LL",
-##            "MOHC_UKESM1-0-LL",
+ ##           "MOHC_UKESM1-0-LL",
             "MPI-M_MPI-ESM1-2-LR","MRI_MRI-ESM2-0",
-                  "NCAR_CESM2","NCC_NorCPM1","NIMS-KMA_KACE-1-0-G",
+            "NCAR_CESM2","NCC_NorCPM1","NIMS-KMA_KACE-1-0-G",
             "NUIST_NESM3")
-## On considère les nmod premiers modèles dans l'ordre alphabétique
-l.mod.sel=l.mod.sel[1:nmod]
+l.mod.sel=sort(sample(l.mod.sel,nmod))
+l.run=c() ## liste des indices de runs
 for(mod in l.mod.sel){
     ls.mod=system(paste("ls psl_",mod,"_historical_r?i?p*_1970-2000.nc",sep=""),
                   intern=TRUE)
     firun=ls.mod[1] ## On prend le premier
+    dum=strsplit(firun,"_")[[1]][5] ## a modifier
+    l.run=c(l.run,dum) 
     print(paste("Read ",firun))
     nc=nc_open(firun)
     time.dum = ncdf4.helpers::nc.get.time.series(nc)
@@ -140,7 +146,7 @@ for(mod in l.mod.sel){
     SLPdum=SLPdum[Iseas,,]
     Ltimes=c(Ltimes,time.CMIP[Iseas])
     Lnames=c(Lnames,rep(mod,times=dim(SLPdum)[1]))
-    SLP=abind(SLP,SLPdum,along=1) ## Concaténation
+    SLP=abind(SLP,SLPdum,along=1)
     l.mod=c(l.mod,mod)
     rm(SLPdum)
 }## end for mod
@@ -149,7 +155,7 @@ for(mod in l.mod.sel){
 mm=floor(Ltimes/100) %% 100
 ## l.modname=unlist(strsplit(l.mod,"_"))[seq(2,2*length(l.mod),by=2)]
 
-## Transformer les noms de modèles en chiffres de 1 à nmod
+## Transformer les noms de modèles en chiffres de 1 à N
 I.mod=match(Lnames,l.mod)
 
 ## Classification par modèle pour chaque saison
@@ -192,13 +198,14 @@ veriMOD=I.mod[I.seas[itest]]
 ## Normalisation des données
 ## train_images <- train_images / 255
 ## test_images <- test_images / 255
-## Nom generique du modèle de NN
-nclass=nmod+1
-nname=paste("SLP_CMIP6_CNN-",nneurons,"-",nclass,"-model-",
-            seas,"_v0",sep="")
-setwd(paste("/home/",user,"/RESULTS",sep=""))
 
+## Nombre de modeles à considerer
+nclass=length(unique(l.mod))
+## Nom generique du modèle de NN
+nname=paste("SLP_CMIP6_CNN-",nneurons,"-",nclass,"-model-",
+            seas,"_",jobid,sep="")
 ## Classification par de Monte Carlo
+setwd(paste("/home/",user,"/RESULTS",sep=""))
 l.OK=c()
 l.OK.test=c()
 score.acc=0
@@ -206,16 +213,14 @@ for(i in 1:nsim){
 ## Definition du modèle de réseau de neuronnes
     nx=dim(trainSLP)[2]
     ny=dim(trainSLP)[3]
-    nclass=length(unique(l.mod))
     model <- keras_model_sequential()
-## Changement par rapport à l'exemple sur les vêtements:
-## on prend une couche de 256 neuronnes
     model %>%
         layer_flatten(input_shape = c(nx, ny)) %>%
         layer_dense(units = nneurons, activation = 'relu') %>%
+##        layer_dropout(rate = 0.5) %>%  # Ajout d'un dropout pour réduire l'overfitting
         layer_dense(units = nclass+1, activation = 'softmax')
 
-## Compilation du modèle
+    ## Compilation du modèle
     model %>% compile(
                   optimizer = 'adam',
                   loss = 'sparse_categorical_crossentropy',
@@ -227,12 +232,18 @@ for(i in 1:nsim){
 
     ## Score du modele
     score <- model %>% evaluate(veriSLP, veriMOD, verbose = 0)
+
 ## Sauvegarder le modèle complet (architecture + poids) s'il est meilleur
 ## que le précédent
     if(score[["accuracy"]] > score.acc){
         score.acc=score[["accuracy"]]
         model %>% save_model(paste(nname,".keras",sep=""),overwrite=TRUE)
     }
+##    save_model_hdf5(model, paste(nname,i,".h5",sep=""))
+##    model %>% save_model(paste(nname,i,".keras",sep=""),overwrite=TRUE)
+
+    cat('Test accuracy:', score[["accuracy"]], "\t")
+    cat('Test loss:', score[["loss"]], "\n")
 
     ## Prediction sur l'ensemble de verification
     predictions <- model %>% predict(veriSLP)
@@ -247,15 +258,15 @@ for(i in 1:nsim){
     }
     l.OK=rbind(l.OK,OK.rate)
 }## end for i 
+##L.OK.seas[[seas]]=l.OK
 
 l.names=matrix(unlist(strsplit(l.mod,"_")),nrow=2)[2,]
 
-## Sauvegarde du résultat
+##setwd("/home/pyiou/RESULTS")
 setwd(paste("/home/",user,"/RESULTS",sep=""))
-filout=paste("test_CMIP-class_v0_",nmod,"_",seas,sep="")
-save(file=paste(filout,".Rdat",sep=""),l.OK,l.names,l.mod.sel,seas,predictions)
+filout=paste("test_CMIP-class_v1_",nmod,"_",seas,"_",jobid,sep="")
+save(file=paste(filout,".Rdat",sep=""),l.OK,l.names,seas,l.mod.sel,l.run)
 
-## Figure de score avec boxplots
 pdf(paste(filout,".pdf",sep=""),width=8)
 i=1
 par(mar=c(9,4,1,1))
@@ -270,7 +281,7 @@ dev.off()
 
 q("no")
 
-## Figure supplémentaire
+## Figures
 dum=t(matrix(unlist(strsplit(names(countsim),"_")),nrow=2))
 ndum=dum[,2]
 modcol=ifelse(countsim>1,"red","blue")
@@ -280,4 +291,40 @@ plot(countsim,type="h",axes=FALSE,ylab="Nb sim.",xlab="",col=modcol,lwd=3)
 axis(side=2)
 axis(side=1,at=c(1:length(countsim)),labels=ndum,las=2)
 box()
+dev.off()
+
+filout="test_CMIP-ez_OK"
+save(file=paste(filout,".Rdat",sep=""),L.OK.seas,l.mod,l.names)
+
+## Figures
+pdf(paste(filout,".pdf",sep=""),width=12)
+layout(matrix(1:4,2,2))
+par(mar=c(4,4,1,1))
+i=1
+for(seas in names(l.seas)){
+    boxplot(L.OK.seas[[seas]],ylab="Prob. success",xlab="Model",
+            axes=FALSE,ylim=c(0.5,1))
+    axis(side=2)
+    axis(side=1,at=c(1:length(l.names)),l.names)
+    box()
+    legend("bottomleft",bty="n",paste("(",letters[i],") ",seas,sep=""))
+    i=i+1
+}
+dev.off()
+
+filout="test_CMIP-test_OK"
+
+pdf(paste(filout,".pdf",sep=""),width=12)
+layout(matrix(1:4,2,2))
+par(mar=c(4,4,1,1))
+i=1
+for(seas in names(l.seas)){
+    boxplot(L.OK.seas.test[[seas]],ylab="Prob. success",xlab="Model",
+            axes=FALSE,ylim=c(0.6,1))
+    axis(side=2)
+    axis(side=1,at=c(1:3),l.modname)
+    box()
+    legend("bottomleft",bty="n",paste("(",letters[i],") ",seas,sep=""))
+    i=i+1
+}
 dev.off()

@@ -6,10 +6,12 @@
 ## (autres runs CMIP6)
 ## Pascal Yiou (LSCE),  Nov. 2024
 ## Demande d'avoir lancé:
-## sbatch ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_classif-v0.sh NMOD
+## sbatch ${HOME}/programmes/RStat/CMIP6class/CMIP6_classif-v1.sh NMOD
 ## Fonctionne sur la machine GPU hal de l'IPSL
 ## Se lance par:
-## R CMD BATCH "--args SAISON NMOD" ${HOME}/programmes/RStat/CMIP6class/V0/CMIP6_tensorflow-verif_v0.R
+## R CMD BATCH "--args SAISON NMOD JOBID" ${HOME}/programmes/RStat/CMIP6class/CMIP6_tensorflow-verif_v1.R
+## ou JOBID=${SLURM_JOB_ID}
+## est décrit dans le script qui a lance le programme précédent
 
 SI=Sys.info()
 user=SI[["user"]]
@@ -50,24 +52,26 @@ i=1
 if(length(args)>0){
     seas = args[i];i=i+1 ## Saison pour le calcul
     nmod = as.numeric(args[i]) ;i=i+1 ## Nombre de modeles à prendre
+    jobid = args[i] ;i=i+1 ## Indice du job
 }else{
     seas = "JJA" ## Saison pour le calcul
-    nmod = 17 ## Nombre de modeles à prendre
+    nmod = 9 ## Nombre de modeles à prendre
+    jobid = "16722"
 }
 
 ## Lecture des résultats de l'étape précédente
 ##setwd("/home/pyiou/RESULTS")
-setwd(paste("/home/",user,"/RESULTS",sep=""))
-##filout=paste("test_CMIP-class_v0_",nmod,"_",seas,"_",jobid,sep="")
-fname=paste("test_CMIP-class_v0_",nmod,"_",seas,sep="")
+##setwd(paste("/home/",user,"/RESULTS",sep=""))
+setwd(paste("/net/nfs/ssd1/",user,"/IA_RESULTS",sep=""))
+##filout=paste("test_CMIP-class_v1_",nmod,"_",seas,"_",jobid,sep="")
+fname=paste("test_CMIP-class_v1_",nmod,"_",seas,"_",jobid,sep="")
 ## save(file=paste(filout,".Rdat",sep=""),l.OK,l.names,seas,l.mod.sel)
 load(paste(fname,".Rdat",sep=""))
 
 nclass=nmod+1
 
 ## Chargement du modèle CNN
-setwd(paste("/home/",user,"/RESULTS",sep=""))
-nname=paste("SLP_CMIP6_CNN-",nneurons,"-",nclass,"-model-",seas,"_v0",sep="")
+nname=paste("SLP_CMIP6_CNN-",nneurons,"-",nclass,"-model-",seas,"_",jobid,sep="")
 model=load_model(paste(nname,".keras",sep=""))
 
 ## Date set up
@@ -118,7 +122,7 @@ imod=2
 for(mod in l.mod.sel){
     ls.mod=system(paste("ls psl_",mod,"_historical_r?i?p*_1970-2000.nc",sep=""),
                   intern=TRUE)
-    firun=ls.mod[2] ## On prend le second
+    firun=ls.mod[3] ## On prend le second
     print(paste("Read ",firun))
     nc=nc_open(firun)
     time.dum = ncdf4.helpers::nc.get.time.series(nc)
@@ -155,17 +159,6 @@ for(imod in 1:length(l.mod)){
     OK.rate=c(OK.rate,OK.imod)
 }
 
-setwd(paste("/home/",user,"/RESULTS",sep=""))
-
-fname=paste("proba-class_CMIP6_",seas,"_",nmod,sep="")
-
-## A qui sont attribuées les SLP?
-Apred=c()
-for(i in 1:length(l.mod)){
-    A=apply(predictions[Imodel==i,2:ncol(predictions)],2,mean)
-    Apred=rbind(Apred,A)
-}
-
 ## Composites de SLP en cas de confusion de classif, pour chaque modèle
 SLP.meandis=c()
 SLP.sddis=c()
@@ -176,25 +169,44 @@ for(imod in 1:length(l.mod)){
     SLP.sddis=abind(SLP.sddis, SLPsd,along=3)
 }
 
-save(file=paste(fname,".Rdat",sep=""),Apred,l.names)
+SLPERA5mean=apply(SLP[Imodel==1,,],c(2,3),mean)
+
+## A qui sont attribuées les SLP?
+Apred=c()
+for(i in 1:length(l.mod)){
+    A=apply(predictions[Imodel==i,2:ncol(predictions)],2,mean)
+    Apred=rbind(Apred,A)
+}
+
+setwd(paste("/home/",user,"/RESULTS",sep=""))
+fname=paste("proba-class-v1_CMIP6_",seas,"_",nmod,sep="")
 
 ## Figures
-## Probabilités de classification pour nmod modèles
 pdf(file=paste(fname,".pdf",sep=""),width=10)
+par(mar=c(8,8,1,1))
 zlim=round(range(Apred),digits=1)
 par(mar=c(9,9,1,2))
 image.plot(1:nrow(Apred),1:ncol(Apred),t(Apred),axes=FALSE,xlab="",ylab="",
-           ##           zlim=c(0.1,1),nlevel=10,col=rev(topo.colors(10)))
            zlim=zlim,nlevel=10,col=rev(pal_grey(0, 1)(10)))
 axis(side=2,at=1:ncol(Apred),labels=l.names,las=2)
 axis(side=1,at=1:nrow(Apred),labels=l.names,las=2)
 box()
 dev.off()
 
-q("no")
-## 
-image.cont(lon,lat,t(SLP.sddis[,,2]))
-image.cont.c(lon,lat,t(SLP.meandis[,,2]),add=TRUE)
+##
+pdf(file=paste("map-diff_v1_",seas,"_",nmod,".pdf",sep=""))
+imod=10
+zlev=seq(-5,5,by=1)
+layout(matrix(1:18,6,3))
+for(imod in 1:length(l.mod)){
+    image.cont(lon,lat,SLP.meandis[,,imod]-SLPERA5mean,transpose=FALSE,
+               mar=c(2,3,1,3),xlab="",ylab="",zlev=zlev,satur=TRUE)
+    image.cont.c(lon,lat,SLP.sddis[,,imod],transpose=FALSE,
+                 mar=c(2,3,1,3),xlab="",ylab="",add=TRUE)
+legend("bottomright",l.names[imod])
+legend("topleft",paste("(",letters[imod],")",sep=""),bty="n")
+}
+dev.off()
 
 q("no")
 
